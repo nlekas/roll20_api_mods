@@ -6,3 +6,6 @@
 /.idea/*
 /.idea/shelf/*
 .*
+/modules.xml
+/Roll20 API Mods.iml
+/vcs.xml
