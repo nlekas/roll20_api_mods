@@ -1,4 +1,4 @@
-# Improved Ping Me
+# Find Me
 This script solves the problem of Roll20 opening the 
 map haphazardly. This causes players to have to search the map for 
 the tokens your players control. 
