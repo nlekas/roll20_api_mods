@@ -7,6 +7,9 @@ To use the script, type !findMe. A list of tokens you control will appear in
 the chat. Click on that token and your screen will be moved to 
 that location.
 
+There is a dependency on the splitArgs script by Brian Shields. You can install 
+that from the roll20 1 click installer.
+
 This is an improvement on another script (see below). The improvement
 accounts for tokens that are controlled my multiple players. This is 
 useful if you are using Roll20 in an in-person session and 
