@@ -33,7 +33,7 @@ function parseTableTops(msg, playerObjs) {
 
 
 function findControllingTableTop(tableTops, characterObj) {
-    let controllersFound = {};
+    let controllersFound = [];
     const controllers = characterObj.get('controlledby').split(",");
     _.each(controllers, function(controller){
         _.each(tableTops, function(tt) {
@@ -42,7 +42,7 @@ function findControllingTableTop(tableTops, characterObj) {
            }
         });
     });
-    if(controllersFound.length() > 1) {
+    if(controllersFound.length > 1) {
         sendChat("Lighting Setup", "Found multiple controlling table tops for character " + characterObj.get('name') + ". Please remove tabletops until it is only controlled by one.")
         errors++;
     }
@@ -84,17 +84,17 @@ function parsePlayers(allPlayerObjs, tableTops) {
     let row;
     let controllingTableTop;
     let characters;
-    let controllingTabletops = {};
+    let controllingTabletops = [];
     _.each(allPlayerObjs, function(p) {
         if(!playerIsGM(p.get('id'))) {
             if (!isTableTop(tableTops, p.get('id'))) {
                 characters = findPlayerCharacters(p);
 
                 _.each(characters, function(c){
-                    controllingTabletops.push(findControllingTableTop(c));
+                    controllingTabletops.push(findControllingTableTop(tableTops, c));
                 });
 
-                if(controllingTabletops.length() > 1) {
+                if(controllingTabletops.length > 1) {
                     sendChat("Lighting Setup", "Found multiple controlling table tops for player " + p.get('displayname') + ". Please remove tabletops from that player's characters until they are only controlled by one.")
                     errors++;
                 }
@@ -123,8 +123,10 @@ on("chat:message",function(msg){
         log(players)
         log(tableTops)
         if(!state.cleanPlayerControlState) state.cleanPlayerControlState = {};
-        state.cleanPlayerControlState = players;
+        if(errors === 0){
+            state.cleanPlayerControlState = players;
         }
+    }
 });
 
 
