@@ -31,7 +31,7 @@ with the player names of your dummy players.
 The script will remove the digital table top assigned 
 to the controlledby setting on the characters except for the one
 at the top of the turn order. However, if it is an npc or other token 
-or custom item it will return control of all players so they can see 
+or custom item it will return tabletop control to all characters so they can see 
 something other than a black screen as the monsters move around 
 on their turn and make attacks.
 

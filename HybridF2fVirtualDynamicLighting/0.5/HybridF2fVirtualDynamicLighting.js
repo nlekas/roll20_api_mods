@@ -1,29 +1,18 @@
 let errors = 0;
 
-function isTableTop (tableTops, playerId){
-    let output = false;
-    _.each(tableTops, function (tt) {
-        if(tt.playerId === playerId){
-            output = true
-        }
-    });
-    return output
-}
 
-
-function parseTableTops(msg, playerObjs) {
-    const tableTopNames = msg.content.split(" ");
-    tableTopNames.shift();
+function parseTableTops(tableTopNames) {
+    const playerObjs = findObjs({_type: 'player'});
     let tableTops = [];
     let row;
-    _.each(tableTopNames, function(tt) {
-        _.each(playerObjs, function(p) {
-           if(p.get('displayname') === tt){
-               row = {
-                   name: tt,
-                   playerId: p.get("id"),
-               }
-           }
+    _.each(tableTopNames, function (tableTop) {
+        _.each(playerObjs, function (player) {
+            if (player.get('displayname') === tableTop) {
+                row = {
+                    name: tableTop,
+                    playerId: player.get("id"),
+                }
+            }
         });
 
         tableTops.push(row)
@@ -32,162 +21,203 @@ function parseTableTops(msg, playerObjs) {
 }
 
 
-function findControllingTableTop(tableTops, characterObj) {
-    let controllersFound = [];
-    const controllers = characterObj.get('controlledby').split(",");
-    _.each(controllers, function(controller){
-        _.each(tableTops, function(tt) {
-           if( controller === tt.playerId){
-               controllersFound.push(controller)
-           }
+function isTableTop(tableTops, playerId) {
+    let output = false;
+    _.each(tableTops, function (tableTop) {
+        if (tableTop.playerId === playerId) {
+            output = true
+        }
+    });
+    return output
+}
+
+
+function buildCleanPlayerControlState(playerNames, tableTopNames) {
+    let name;
+    let characterId;
+    let playerControllers = [];
+    let tableTopId;
+    let controllers;
+    let tableTops = parseTableTops(tableTopNames);
+    let row;
+
+    const characters = findObjs({_type: 'character'});
+    _.each(characters, function(character){
+        _.each(playerNames, function(playerName){
+            if(playerName === character){
+                name = character.get("name")
+                characterId = character.get("id")
+                controllers = character.get('controlledby').split(",");
+                _.each(controllers, function(controller){
+                    if(isTableTop(tableTops, controller)){
+                        if(!tableTopId){
+                            tableTopId = controller;
+                        } else {
+                            sendChat("Lighting Setup", "Found multiple controlling tabletops for " + name + ". Please only have 1 controlling tabletop per character.");
+                            errors++;
+                        }
+                    } else {
+                        playerControllers.push(controller);
+                    }
+                });
+                row = {
+                    name: name,
+                    characterId: characterId,
+                    playerControllersIds: playerControllers,
+                    tableTopId: tableTopId
+                };
+                // todo: Why is execution not reaching here and we are ending up with an empty character array
+                state.cleanPlayerControlState.characters.push(row);
+            }
         });
     });
-    if(controllersFound.length > 1) {
-        sendChat("Lighting Setup", "Found multiple controlling table tops for character " + characterObj.get('name') + ". Please remove tabletops until it is only controlled by one.")
+}
+
+
+function parseRegisterMsg(msg, source) {
+    if (msg.content.indexOf("|") > 0) {
+        const items = msg.content.split("|");
+        items.shift();
+        return items
+    } else {
+        let typeOfArgs = "";
+        if (source === "registerPlayers") typeOfArgs = "player names";
+        if (source === "registerTableTops") typeOfArgs = "table top names";
+        sendChat("Lighting Setup", "No arguments passed to " + source + ". Please pass " + typeOfArgs + " to " + source + " separated by pipes");
         errors++;
     }
-    return controllersFound[0]
 }
 
 
-function isControlledByPlayer(characterObj, playerId){
-    let output = false;
-    const controllers = characterObj.get('controlledby').split(",");
-    _.each(controllers, function(controller) {
-       if(controller === playerId){
-           output = true;
-       }
-    });
-    return output;
+function initRegistry(reset) {
+    if (!state.registry) state.registry = {"tableTopsNames": [], "playerCharacterNames": []};
+    if (reset) state.registry = {"tableTopsNames": [], "playerCharacterNames": []};
 }
 
 
-function findPlayerCharacters (playerObj){
-    let playerCharacters = [];
-    const characterObjs = findObjs({_type: 'character'});
-
-    _.each(characterObjs, function(character) {
-      if(isControlledByPlayer(character, playerObj.get('id'))){
-          playerCharacters.push(character);
-      }
-   });
-    if(playerCharacters.length === 0){
-        sendChat("Lighting Setup", "Cannot find any characters for player " + playerObj.get("displayname") + ". Please give this player control of a character.");
-        errors++;
-    }
-    return playerCharacters;
+function initCleanPlayerControlState(reset) {
+    if (!state.registry) state.cleanPlayerControlState = {"characters": []};
+    if (reset) state.cleanPlayerControlState = {"characters": []};
 }
 
 
-function parsePlayers(allPlayerObjs, tableTops) {
-    let players = [];
-    let row;
-    let controllingTableTop;
-    let characters;
-    let controllingTabletops = [];
-    _.each(allPlayerObjs, function(p) {
-        if(!playerIsGM(p.get('id'))) {
-            if (!isTableTop(tableTops, p.get('id'))) {
-                characters = findPlayerCharacters(p);
-
-                _.each(characters, function(c){
-                    controllingTabletops.push(findControllingTableTop(tableTops, c));
-                });
-
-                if(controllingTabletops.length > 1) {
-                    sendChat("Lighting Setup", "Found multiple controlling table tops for player " + p.get('displayname') + ". Please remove tabletops from that player's characters until they are only controlled by one.")
-                    errors++;
-                }
-
-                controllingTableTop = controllingTabletops[0];
-
-                row = {
-                    playerName: p.get('displayname'),
-                    playerId: p.get('id'),
-                    tableTop: controllingTableTop,
-                    characters: characters
-                };
-                players.push(row);
-            }
+on("chat:message", function (msg) {
+    if (msg.type === "api" && msg.content.indexOf("!resetRegistry") === 0) {
+        initRegistry(true);
+    } else if (msg.type === "api" && msg.content.indexOf("!registerPlayers") === 0) {
+        errors = 0
+        let playerNames = parseRegisterMsg(msg, "registerPlayers")
+        initRegistry(false);
+        if (errors === 0) {
+            state.registry.playerCharacterNames = playerNames;
         }
-    });
-    return players;
-}
-
-on("chat:message",function(msg){
-    if(msg.type==="api" && msg.content.indexOf("!setupLighting")===0){
-        errors = 0;
-        const allPlayerObjs = findObjs({_type: 'player'});
-        const tableTops = parseTableTops(msg, allPlayerObjs);
-        const players = parsePlayers(allPlayerObjs, tableTops);
-        log(players)
-        log(tableTops)
-        if(!state.cleanPlayerControlState) state.cleanPlayerControlState = {};
-        if(errors === 0){
-            state.cleanPlayerControlState = players;
+    } else if (msg.type === "api" && msg.content.indexOf("!registerTableTops") === 0) {
+        errors = 0
+        let tableTops = parseRegisterMsg(msg, "registerTableTops")
+        initRegistry(false);
+        if (errors === 0) {
+            state.registry.tableTopsNames = tableTops;
+        }
+    } else if (msg.type === "api" && msg.content.indexOf("!resetLighting") === 0) {
+        initCleanPlayerControlState(true);
+    } else if (msg.type === "api" && msg.content.indexOf("!setupLighting") === 0) {
+        initCleanPlayerControlState(true);
+        if(state.registry.playerCharacterNames.length === 0){
+            sendChat("Lighting Setup", "Player character names not found. Run registerPlayers to set player names.");
+            errors++;
+        }
+        if(state.registry.tableTopsNames.length === 0){
+            sendChat("Lighting Setup", "Table top names not found. Run registerTableTops to set table top names.");
+            errors++;
+        }
+        if (errors === 0) {
+            buildCleanPlayerControlState(state.registry.playerCharacterNames, state.registry.tableTopsNames)
         }
     }
 });
 
 
-on("chat:message",function(msg){
-    if(msg.type==="api" && msg.content.indexOf("!resetLighting")===0){
-        state.cleanPlayerControlState = {}
+function getTurnControllers(character, tabletops, players) {
+    let controlledBy = ""
+
+    if (players) {
+        _.each(character.playerControllerIds, function (controllerPlayer) {
+            controlledBy += "," + controllerPlayer;
+        });
     }
-});
+
+    if (tabletops) {
+        controlledBy += "," + character.tableTopId;
+    }
+
+    return controlledBy;
+}
 
 
+function setControlledByAll(tabletop, players) {
+    let controlledBy;
+    _.each(state.cleanPlayerControlState.characters, function (character) {
+        controlledBy = getTurnControllers(character, tabletop, players);
+        getObj("character", character.characterId).set("controlledby", controlledBy);
+    });
+}
+
+function getPlayerCharacterIds(){
+    let characterIds = [];
+    _.each(state.cleanPlayerControlState.characters, function(character){
+        characterIds.push(character.characterId)
+    });
+    return characterIds;
+}
+
+
+function getCharacterFromState(characterId){
+    let outputCharacter;
+    _.each(state.cleanPlayerControlState.characters, function(character){
+        if(characterId === character.characterId){
+            outputCharacter = character;
+        }
+    });
+    return outputCharacter
+}
+// todo: test and debug this function after fixing void playercontrolstate
 on("change:campaign:turnorder", function (current, previous) {
-
     const CurrentTO = JSON.parse(current.get("turnorder"));
-    const PreviousTO = JSON.parse(previous["turnorder"]);
+    // const PreviousTO = JSON.parse(previous["turnorder"]);
     let Token;
     let Character;
+    let stateCharacter;
 
-    // Save F2F data...
-    if (!state.f2f) state.f2f = {};
-    if (_.isEmpty(state.f2f)) {
-        _.each(CharacterIds, function (charid) {
-            Character = getObj("character", charid);
-            state.f2f[charid] = {
-                CharacterID: charid,
-                ControlledBy: Character.get("controlledby")
-            }
-        });
+    if (!state.cleanPlayerControlState) {
+        sendChat("Lighting Manager", "Lighting setup not performed. Hybrid F2F Virtual Dynamic Lighting not configured. Please register your players and tabletops (!registerPlayers & !registerTableTops). Then run !setupLighting");
+        errors++;
     }
 
+    let controlledBy;
     // Process the turn order...
     if (CurrentTO.length > 0) {
-        _.each(state.f2f, function (a) {
-            // todo: set controlled by to player(s) ids not table tops.
-            getObj("character", a["CharacterID"]).set("controlledby", "");
-        });
+        // Give control to only online players, remove tabletop control for all characters
+        setControlledByAll(false, true);
+        // Get Token ID of current entity's turn
         if (CurrentTO[0].id !== -1) Token = getObj("graphic", CurrentTO[0].id);
+        // Get Character represents of current Token
         if (CurrentTO[0].id !== -1 && Token.get("represents") !== "") Character = getObj("character", Token.get("represents"));
-        // tODO: Loop on new player/character array and check if character is in array
-        // todo: store table tops that control the character
-        if (CurrentTO[0].id !== -1 && Token.get("represents") !== "" && Character.id in state.f2f) {
-            // todo: set to be controlled by player(s) & table tops that control character
-            Character.set("controlledby", state.f2f[Character.id]["ControlledBy"]);
+        // Check if current token is a player character
+        if (CurrentTO[0].id !== -1 && Token.get("represents") !== "" && Character.id in getPlayerCharacterIds()) {
+            stateCharacter = getCharacterFromState(Character.id)
+            controlledBy = getTurnControllers(stateCharacter, true, true);
+            Character.set("controlledby", controlledBy);
         } else {
-            // Return control to all players during npc and custom item turns...
-            _.each(state.f2f, function (b) {
-                // todo: restore original array view
-                getObj("character", b["CharacterID"]).set("controlledby", b["ControlledBy"]);
-            });
+            // If current token is not a player character, return control to all players during npc and custom item turns...
+            setControlledByAll(true, true);
         }
     } else {
         // Turn order tracker is empty. Return control to all players...
-        _.each(state.f2f, function (z) {
-            // todo: restore original array view
-            getObj("character", z["CharacterID"]).set("controlledby", z["ControlledBy"]);
-        });
-        state.f2f = {};
-
+        setControlledByAll(true, true);
     }
 
     // Simple Initiative Tracker (Green Dot)...
-    if (CurrentTO.length === 0 && PreviousTO[0].id !== -1) getObj("graphic", PreviousTO[0].id).set("status_green", false);
+    /*if (CurrentTO.length === 0 && PreviousTO[0].id !== -1) getObj("graphic", PreviousTO[0].id).set("status_green", false);
     if (CurrentTO.length > 0 && CurrentTO[0].id !== -1) getObj("graphic", CurrentTO[0].id).set("status_green", true);
-    if (PreviousTO.length > 0 && PreviousTO[0].id !== -1) getObj("graphic", PreviousTO[0].id).set("status_green", false);
+    if (PreviousTO.length > 0 && PreviousTO[0].id !== -1) getObj("graphic", PreviousTO[0].id).set("status_green", false);*/
 });
