@@ -101,42 +101,6 @@ function initCleanPlayerControlState(reset) {
 }
 
 
-on("chat:message", function (msg) {
-    if (msg.type === "api" && msg.content.indexOf("!resetRegistry") === 0) {
-        initRegistry(true);
-    } else if (msg.type === "api" && msg.content.indexOf("!registerPlayers") === 0) {
-        errors = 0
-        let playerNames = parseRegisterMsg(msg, "registerPlayers")
-        initRegistry(false);
-        if (errors === 0) {
-            state.registry.playerCharacterNames = playerNames;
-        }
-    } else if (msg.type === "api" && msg.content.indexOf("!registerTableTops") === 0) {
-        errors = 0
-        let tableTops = parseRegisterMsg(msg, "registerTableTops")
-        initRegistry(false);
-        if (errors === 0) {
-            state.registry.tableTopsNames = tableTops;
-        }
-    } else if (msg.type === "api" && msg.content.indexOf("!resetLighting") === 0) {
-        initCleanPlayerControlState(true);
-    } else if (msg.type === "api" && msg.content.indexOf("!setupLighting") === 0) {
-        initCleanPlayerControlState(true);
-        if(state.registry.playerCharacterNames.length === 0){
-            sendChat("Lighting Setup", "Player character names not found. Run registerPlayers to set player names.");
-            errors++;
-        }
-        if(state.registry.tableTopsNames.length === 0){
-            sendChat("Lighting Setup", "Table top names not found. Run registerTableTops to set table top names.");
-            errors++;
-        }
-        if (errors === 0) {
-            buildCleanPlayerControlState(state.registry.playerCharacterNames, state.registry.tableTopsNames)
-        }
-    }
-});
-
-
 function getTurnControllers(character, tabletops, players) {
     let controlledBy = ""
 
@@ -180,6 +144,55 @@ function getCharacterFromState(characterId){
     });
     return outputCharacter
 }
+
+
+on("chat:message", function (msg) {
+    if (msg.type === "api" && msg.content.indexOf("!resetRegistry") === 0) {
+        initRegistry(true);
+    } else if (msg.type === "api" && msg.content.indexOf("!registerPlayers") === 0) {
+        errors = 0
+        let playerNames = parseRegisterMsg(msg, "registerPlayers")
+        initRegistry(false);
+        if (errors === 0) {
+            state.registry.playerCharacterNames = playerNames;
+        }
+    } else if (msg.type === "api" && msg.content.indexOf("!registerTableTops") === 0) {
+        errors = 0
+        let tableTops = parseRegisterMsg(msg, "registerTableTops")
+        initRegistry(false);
+        if (errors === 0) {
+            state.registry.tableTopsNames = tableTops;
+        }
+    } else if (msg.type === "api" && msg.content.indexOf("!resetLighting") === 0) {
+        initCleanPlayerControlState(true);
+    } else if (msg.type === "api" && msg.content.indexOf("!setupLighting") === 0) {
+        initCleanPlayerControlState(true);
+        if(state.registry.playerCharacterNames.length === 0){
+            sendChat("Lighting Setup", "Player character names not found. Run registerPlayers to set player names.");
+            errors++;
+        }
+        if(state.registry.tableTopsNames.length === 0){
+            sendChat("Lighting Setup", "Table top names not found. Run registerTableTops to set table top names.");
+            errors++;
+        }
+        if (errors === 0) {
+            buildCleanPlayerControlState(state.registry.playerCharacterNames, state.registry.tableTopsNames)
+        }
+    } else if (msg.type === "api" && msg.content.indexOf("!readState") === 0) {
+        if(state.registry) {
+            log(state.registry);
+        } else {
+            log("No registry")
+        }
+        if(state.cleanPlayerControlState) {
+            log(state.cleanPlayerControlState);
+        } else {
+            log("No cleanPlayerControlState")
+        }
+    }
+});
+
+
 // todo: test and debug this function after fixing void playercontrolstate
 on("change:campaign:turnorder", function (current, previous) {
     const CurrentTO = JSON.parse(current.get("turnorder"));
