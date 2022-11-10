@@ -2,7 +2,7 @@
  * This script creates FX animations for tokens' active statuses, cycling
  * through each one.
  */
-var StatusFX = (function() {
+var UpdatedStatusFX = (function() {
 
     /**
      * The UpdatedStatusFX state.
@@ -122,7 +122,7 @@ var StatusFX = (function() {
             'MageArmor': 'MageArmor',
             'dead': 'Death',
             'custom': '',
-            'interval': 500
+            'interval': 1000
         };
 
         state.UpdatedStatusFX.fx = {};
@@ -365,14 +365,6 @@ var StatusFX = (function() {
             delete state.UpdatedStatusFX.dead[state.UpdatedStatusFX.dead.findIndex(function(x) {return x === token.get('_id')})];
         }
 
-
-        // If CustomStatusMarkers is installed, get the active custom markers for
-        // this token too.
-        if(typeof CustomStatusMarkers !== 'undefined') {
-            var customStatuses = CustomStatusMarkers.getStatusMarkers(token);
-            statuses = statuses.concat(customStatuses);
-        }
-
         // Update the token state's active statuses.
         if(statuses.length > 0) {
             if(!tokenState) {
@@ -383,11 +375,11 @@ var StatusFX = (function() {
                 state.UpdatedStatusFX.tokens[token.get('_id')] = tokenState;
             }
             tokenState.statuses = statuses;
+        } else if(tokenState) {
+            // If there are no more active statuses, remove the token from the state.
+            delete state.UpdatedStatusFX.tokens[token.get('_id')];
         }
 
-        // If there are no more active statuses, remove the token from the state.
-        else if(tokenState)
-            delete state.UpdatedStatusFX.tokens[token.get('_id')];
     }
 
     // Start the FX spawn interval.
