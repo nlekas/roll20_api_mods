@@ -1,23 +1,13 @@
-/////////////////////////////////////////////////
-/***********************************************/
-var BloodAndHonor = {
-    author: {
-        name: "John C." || "Echo" || "SplenectomY",
-        company: "Team Asshat" || "The Alehounds",
-        contact: "echo@TeamAsshat.com",
-    },
-    version: "0.8.1", // The Aaron - Patched for playerIsGM(), createObj(), and randomInteger() crash.
-    gist: "https://gist.github.com/SplenectomY/097dac3e427ec50f32c9",
-    forum: "https://app.roll20.net/forum/post/1477230/",
-    wiki: "https://wiki.roll20.net/Script:Blood_And_Honor:_Automatic_blood_spatter,_pooling_and_trail_effects",
-    /***********************************************/
-/////////////////////////////////////////////////
+let bloodTrails = {
     // Bloodied status effect icon name
     bloodied: "Bloodied::5614630",
+
     // Dead status effect icon name
     dead: "dead",
+
     // Bloodied status applied after losing this percentage of health
     bloodied_percent: 0.5,
+
     // This value should match the size of a standard grid in your campaign
     // Default is 70 px x 70 px square, Roll20's default.
     tokenSize: 70,
@@ -33,37 +23,46 @@ var BloodAndHonor = {
     // https://wiki.roll20.net/API:Objects#imgsrc_and_avatar_property_restrictions
     // You can add as many as you'd like to either category.
     // Spatters are also used for blood trails.
+    // todo: Write function to get blood spatters and pools from library folder automatically
     spatters: [
         //"https://s3.amazonaws.com/files.d20.io/images/6993500/mAA-8agYIwkhEciVVSCFmg/thumb.png?1420411542",
         "https://s3.amazonaws.com/files.d20.io/images/312732953/jO181hhmixoXi4pM1iGhjA/thumb.png?1667632396",
 
     ],
+
     pools: [
         //"https://s3.amazonaws.com/files.d20.io/images/6993478/77YowTZze57mGAHfSaxwYg/thumb.png?1420411480",
         "https://s3.amazonaws.com/files.d20.io/images/312732954/WaHBPqcbZC_htgxg6fVGAg/thumb.png?1667632396",
 
     ],
+
     chooseBlood: function chooseBlood(type) {
-        if (type === "spatter") return BloodAndHonor.spatters[randomInteger(BloodAndHonor.spatters.length) - 1];
-        if (type === "pool") return BloodAndHonor.pools[randomInteger(BloodAndHonor.pools.length) - 1];
+        if (type === "spatter") return bloodTrails.spatters[randomInteger(bloodTrails.spatters.length) - 1];
+        if (type === "pool") return bloodTrails.pools[randomInteger(bloodTrails.pools.length) - 1];
     },
+
     getOffset: function getOffset() {
         if (randomInteger(2) === 1) return 1;
         else return -1;
     },
+
     bloodColor: function bloodColor(gmnotes) {
         if (gmnotes.indexOf("bloodcolor_purple") !== -1) return "#0000ff";
         if (gmnotes.indexOf("bloodcolor_blue") !== -1) return "#00ffff";
         if (gmnotes.indexOf("bloodcolor_orange") !== -1) return "#ffff00";
         else return "transparent"
     },
-    createBlood: function createBlood(gPage_id,gLeft,gTop,gWidth,gType,gColor) {
-        gLeft = gLeft + (randomInteger(Math.floor(gWidth / 2)) * BloodAndHonor.getOffset());
-        gTop = gTop + (randomInteger(Math.floor(gWidth / 2)) * BloodAndHonor.getOffset());
-        setTimeout(function(){
-            toFront(createObj("graphic",{
+
+    createBlood: function createBlood(gPage_id, gLeft, gTop, gWidth, gType, gColor) {
+        gLeft = gLeft + (randomInteger(Math.floor(gWidth / 2)) * bloodTrails.getOffset());
+        gTop = gTop + (randomInteger(Math.floor(gWidth / 2)) * bloodTrails.getOffset());
+        // todo: See if I can make it work with blood animations instead of just graphics
+        // todo: See if I can make spatter bigger based on damage received up to a certain max
+        // todo: make blood pools surround token on all sides (e.g., if token is medium (5ft square) then pool is 15ft cube)
+        setTimeout(function () {
+            toFront(createObj("graphic", {
                 imgsrc: gType,
-                gmnotes: "blood",
+                gmnotes: "isBloodTrailsBloodToken",
                 pageid: gPage_id,
                 left: gLeft,
                 tint_color: gColor,
@@ -73,24 +72,24 @@ var BloodAndHonor = {
                 height: gWidth,
                 layer: "map",
             }));
-        },50);
+        }, 50);
     },
+
     timeout: 0,
+
     onTimeout: function theFinalCountdown() {
-        if (BloodAndHonor.timeout > 0) {
-            BloodAndHonor.timeout--;
-        } else {
-            return;
+        if (bloodTrails.timeout > 0) {
+            bloodTrails.timeout--;
         }
     },
 
-    setStatusMarker: function setStatusMarker(obj, onOff, status){
+    setStatusMarker: function setStatusMarker(obj, onOff, status) {
         let currentMarkers = obj.get("statusmarkers").split(',');
 
-        if(currentMarkers.indexOf(status) !== -1 && onOff === false){
+        if (currentMarkers.indexOf(status) !== -1 && onOff === false) {
             delete currentMarkers[currentMarkers.indexOf(status)];
             obj.set("statusmarkers", currentMarkers.join(','));
-        } else if(currentMarkers.indexOf(status) === -1 && onOff === true){
+        } else if (currentMarkers.indexOf(status) === -1 && onOff === true) {
             currentMarkers.push(status);
             obj.set("statusmarkers", currentMarkers.join(','));
         }
@@ -99,13 +98,13 @@ var BloodAndHonor = {
     setBloodied: function setBloodied(obj) {
         const b3Max = obj.get("bar3_max");
         const b3Value = obj.get("bar3_value");
-        const lossToBloodied = obj.get("bar3_value") * this.bloodied_percent;
-        const bloodiedThreshold = b3Max - lossToBloodied
-        if(b3Value <= bloodiedThreshold && b3Value > 0) {
+        const bloodiedThreshold = b3Max - (obj.get("bar3_value") * this.bloodied_percent)
+
+        if (b3Value <= bloodiedThreshold && b3Value > 0) {
             this.setStatusMarker(obj, true, this.bloodied);
-        } else if(b3Value > bloodiedThreshold){
+        } else if (b3Value > bloodiedThreshold) {
             this.setStatusMarker(obj, false, this.bloodied);
-        } else if(b3Value <= 0) {
+        } else if (b3Value <= 0) {
             this.setStatusMarker(obj, false, this.bloodied);
         }
     },
@@ -113,7 +112,7 @@ var BloodAndHonor = {
     setDead: function setDead(obj) {
         const b3Value = obj.get("bar3_value");
 
-        if(b3Value <= 0) {
+        if (b3Value <= 0) {
             this.setStatusMarker(obj, true, this.dead)
         } else {
             this.setStatusMarker(obj, false, this.dead)
@@ -121,56 +120,108 @@ var BloodAndHonor = {
     }
 };
 
-on("ready", function(obj) {
+on("ready", function (obj) {
 
-    setInterval(function(){BloodAndHonor.onTimeout()},1000);
+    setInterval(function () {
+        bloodTrails.onTimeout()
+    }, 1000);
 
-    on("change:graphic:bar3_value", function(obj, prev) {
+    // todo: need to rethink this as the obj and prev values don't come into play until the change:graphic:bar3_value event
+    // Get values for checks
+    let b3Max = obj.get("bar3_max");
+    let b3Value = obj.get("bar3_value");
+    let b3PrevValue = prev["bar3_value"];
+    let noBlood = obj.get("gmnotes").indexOf("noblood") !== -1;
+    let onObjectLayer = obj.get("layer") === "objects"
+    let bloodThreshold;
+    let bloodMultiplier;
+    let onSpatter;
+    let bloodied;
+    let hasLostHp;
+    let isDead;
+    let eligibleObj = b3Max !== "" || onObjectLayer || !noBlood
+    if (eligibleObj) {
+        bloodThreshold = obj.get("bar3_max") - (obj.get("bar3_max") * bloodTrails.bloodied_percent);
+        bloodMultiplier = 1 + (b3Value - b3PrevValue) / b3Max;
+        // todo: come up with better spatter chance formula
+        onSpatter = randomInteger(b3Max) > b3Value;
+        bloodied = b3Value <= bloodThreshold;
+        hasLostHp = b3PrevValue > b3Value;
+        isDead = b3Value <= 0;
+    }
+
+    on("change:graphic:bar3_value", function (obj, prev) {
         // Set bloodied status
-        BloodAndHonor.setBloodied(obj);
-        BloodAndHonor.setDead(obj);
+        bloodTrails.setBloodied(obj);
+        bloodTrails.setDead(obj);
 
         // Create Blood Splatter
-        if (obj.get("bar3_max") === "" || obj.get("layer") !== "objects" || (obj.get("gmnotes")).indexOf("noblood") !== -1) {
-            // Do nothing
-        } else if (obj.get("bar3_value") <= obj.get("bar3_max") / 2 && prev["bar3_value"] > obj.get("bar3_value") && obj.get("bar3_value") > 0) {
+        if (bloodied && hasLostHp && !isDead && eligibleObj) {
             // Create spatter near token if "bloodied".
             // Chance of spatter depends on severity of damage
-            if (randomInteger(obj.get("bar3_max")) > obj.get("bar3_value")) {
-                var bloodMult = 1 + ((obj.get("bar3_value") - prev["bar3_value"]) / obj.get("bar3_max"));
-                BloodAndHonor.createBlood(obj.get("_pageid"), obj.get("left"), obj.get("top"), Math.floor(BloodAndHonor.tokenSize * bloodMult), BloodAndHonor.chooseBlood("spatter"), BloodAndHonor.bloodColor(obj.get("gmnotes")));
+            if (onSpatter) {
+                bloodMultiplier
+                bloodTrails.createBlood(
+                    obj.get("_pageid"),
+                    obj.get("left"),
+                    obj.get("top"),
+                    Math.floor(bloodTrails.tokenSize * bloodMult),
+                    bloodTrails.chooseBlood("spatter"),
+                    bloodTrails.bloodColor(obj.get("gmnotes"))
+                );
             }
+
+        } else if (isDead && eligibleObj) {
             // Create pool near token if health drops below 1.
-        } else if (obj.get("bar3_value") <= 0) {
-            BloodAndHonor.createBlood(obj.get("_pageid"), obj.get("left"), obj.get("top"), Math.floor(BloodAndHonor.tokenSize * 1.5), BloodAndHonor.chooseBlood("pool"), BloodAndHonor.bloodColor(obj.get("gmnotes")));
+            bloodTrails.createBlood(
+                obj.get("_pageid"),
+                obj.get("left"),
+                obj.get("top"),
+                Math.floor(bloodTrails.tokenSize * 1.5),
+                bloodTrails.chooseBlood("pool"),
+                bloodTrails.bloodColor(obj.get("gmnotes"))
+            );
         }
     });
 
-//Make blood trails, chance goes up depending on how injured a token is
-    on("change:graphic:lastmove", function(obj) {
-        if (BloodAndHonor.timeout === 0) {
-            if (obj.get("bar3_value") <= obj.get("bar3_max") / 2 && (obj.get("gmnotes")).indexOf("noblood") === -1) {
-                if (randomInteger(obj.get("bar3_max")) > obj.get("bar3_value")) {
-                    BloodAndHonor.createBlood(obj.get("_pageid"), obj.get("left"), obj.get("top"), Math.floor(BloodAndHonor.tokenSize / 2), BloodAndHonor.chooseBlood("spatter"), BloodAndHonor.bloodColor(obj.get("gmnotes")));
-                    BloodAndHonor.timeout += 2;
+    //Make blood trails, chance goes up depending on how injured a token is
+    on("change:graphic:lastmove", function (obj) {
+        if (bloodTrails.timeout === 0) {
+            if (bloodied && !noBlood && eligibleObj){
+                if (onSpatter) {
+                    bloodTrails.createBlood(
+                        obj.get("_pageid"),
+                        obj.get("left"),
+                        obj.get("top"),
+                        Math.floor(bloodTrails.tokenSize / 2),
+                        bloodTrails.chooseBlood("spatter"),
+                        bloodTrails.bloodColor(obj.get("gmnotes"))
+                    );
+                    bloodTrails.timeout += 2;
                 }
             }
         }
     });
 
-    on("chat:message", function(msg) {
+    // Clear blood
+    on("chat:message", function (msg) {
         if (msg.type === "api" && msg.content.indexOf("!clearblood") !== -1) {
-            if (BloodAndHonor.useIsGM && !playerIsGM(msg.playerid)) {
-                sendChat(msg.who,"/w " + msg.who + " You are not authorized to use that command!");
+            if (bloodTrails.useIsGM && !playerIsGM(msg.playerid)) {
+                sendChat(msg.who, "/w " + msg.who + " You are not authorized to use that command!");
             } else {
-                objects = filterObjs(function(obj) {
-                    if(obj.get("type") === "graphic" && obj.get("gmnotes") === "blood") return true;
-                    else return false;
+                // todo: fix this who area to only remove the blood tokens. Currently removes blood tokens and tokens that have dropped blood.
+                objects = filterObjs(function (obj) {
+                    return obj.get("type") === "graphic" && obj.get("gmnotes") === "isBloodTrailsBloodToken";
                 });
-                _.each(objects, function(obj) {
+                _.each(objects, function (obj) {
                     obj.remove();
                 });
             }
         }
+        // todo: add function to set blood color based on hex value to selected token(s)
+        // todo: add function to setup default blood colors into state (e.g., state.bloodTrails.bloodColors = {purple: "#0000ff", blue: "#00ffff"}
+        // todo: add function to setup bloodied and dead status marker values
+        // todo: add function to setup bloodied hp loss percentage
+        // todo: add function to set useIsGM
     });
 });
