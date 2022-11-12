@@ -1,4 +1,4 @@
-var FindMe = (function() {
+let findMe = (function() {
     function pingPlayer(characterId, playerId, playerName) {
         let playerToken = findObjs({
             type: "graphic",

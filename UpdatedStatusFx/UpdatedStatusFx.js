@@ -2,7 +2,7 @@
  * This script creates FX animations for tokens' active statuses, cycling
  * through each one.
  */
-var UpdatedStatusFX = (function() {
+let updatedStatusFX = (function() {
 
     /**
      * The UpdatedStatusFX state.

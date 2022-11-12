@@ -1,4 +1,4 @@
-var HybridF2fVirtualDynamicLighting = (function(){
+let hybridF2fVirtualDynamicLighting = (function(){
     let errors = 0;
 
     function parseTableTops(tableTopNames) {
