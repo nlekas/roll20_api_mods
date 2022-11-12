@@ -6,16 +6,20 @@ let bloodTrails = (function () {
     let dead = "dead"
 
     // Bloodied status applied after losing this percentage of health
-    bloodied_percent: 0.5,
+    let bloodied_percent = 0.5
 
     // This value should match the size of a standard grid in your campaign
     // Default is 70 px x 70 px square, Roll20's default.
-    tokenSize: 70,
+    let tokenSize = 70
 
     // If you have it installed, this will plug in TheAaron's isGM auth module,
     // which will make it so only the GM can use the !clearblood command
     // Change to "true" if you want to check for authorization
-    useIsGM: false,
+    let useIsGM = false
+
+    // Blood Multiplier Increase Percentage
+    // Want more blood, up the blood multiplier for more blood and guts
+    let bloodMultiplierUp = 0
 
     // YOU MUST ADD YOUR OWN SPLATTERS AND POOLS TO YOUR LIBRARY
     // AND GET THE IMAGE LINK VIA YOUR WEB BROWSER.
