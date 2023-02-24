@@ -1,4 +1,4 @@
-let hybridF2fVirtualDynamicLighting = (function(){
+let hybridF2fVirtualDynamicLighting = (function () {
     let errors = 0;
 
     function parseTableTops(tableTopNames) {
@@ -20,50 +20,134 @@ let hybridF2fVirtualDynamicLighting = (function(){
         return tableTops;
     }
 
-    function tableTopsObjectToIdArray(tableTops){
+    function tableTopsObjectToIdArray(tableTops) {
         ids = [];
-        _.each(tableTops, function(tableTop){
+        _.each(tableTops, function (tableTop) {
             ids.push(tableTop.playerId)
         });
         return ids
+    }
+
+    function getPlayerNameFromId(playerId) {
+        let players = findObjs({_type: 'player'});
+        let playerName = "";
+        _.each(players, function (player) {
+            if(playerId !== "") {
+                if (player.get("id").indexOf(playerId) !== -1) {
+                    playerName = player.get("displayname")
+                }
+            }
+
+
+        })
+        return playerName
+    }
+
+
+    function returnNameString(playerIds) {
+        let nameString = "";
+        if(playerIds.length > 0) {
+            _.each(playerIds, function(playerId){
+                if (nameString === "") {
+                    nameString = getPlayerNameFromId(playerId)
+                } else {
+                    nameString = nameString + ", " + getPlayerNameFromId(playerId)
+                }
+
+            })
+        }
+        return nameString
+    }
+
+
+    function matchPlayerName(match, names){
+        let matchBool = false;
+        _.each(names, function(name){
+            if(name === match){
+                matchBool = true;
+            }
+        })
+        return matchBool;
     }
 
 
     function buildCleanPlayerControlState(playerNames, tableTopNames) {
         let name;
         let characterId;
-        let playerControllers = [];
+        let playerControllerIds = [];
         let tableTopIds = [];
         let controllers;
         let tableTops = tableTopsObjectToIdArray(parseTableTops(tableTopNames));
         let row;
 
         const characters = findObjs({_type: 'character'});
-        _.each(characters, function(character){
+        _.each(characters, function (character) {
             name = character.get("name")
-            if(playerNames.indexOf(name) !== -1){
+            if (matchPlayerName(name, playerNames)) {
                 characterId = character.get("id")
                 controllers = character.get('controlledby').split(",");
-                _.each(controllers, function(controller){
-                    if(tableTops.indexOf(controller) !== -1){
-                        tableTopIds.push(controller);
-                    } else {
-                        playerControllers.push(controller);
+                _.each(controllers, function (controller) {
+                    if(controller !== "") {
+                        if (tableTops.indexOf(controller) !== -1) {
+                            tableTopIds.push(controller);
+                        } else {
+                            playerControllerIds.push(controller);
+                        }
                     }
                 });
-                row = {
-                    name: name,
-                    characterId: characterId,
-                    playerControllersIds: playerControllers,
-                    tableTopId: tableTopIds
-                };
-                state.cleanPlayerControlState.characters.push(row);
-                playerControllers = [];
+                if(playerControllerIds.length > 0 || tableTopIds.length > 0){
+                    row = {
+                        name: name,
+                        characterId: characterId,
+                        playerControllersIds: playerControllerIds,
+                        tableTopId: tableTopIds
+                    };
+
+                    state.cleanPlayerControlState.characters.push(row);
+                    sendChat("Lighting Setup", "Building control state for: " + name + ". Player Controllers: " + returnNameString(playerControllerIds) + ". Tabletop Controllers: " + returnNameString(tableTopIds) + ".")
+                }
+                playerControllerIds = [];
                 tableTopIds = [];
             }
         });
     }
 
+
+    function parseSetupMessage(msg) {
+        let players;
+        let tableTops;
+        let workingCommand;
+        if (msg.content.indexOf("||") > 0) {
+            const commands = msg.content.split("||");
+            commands.shift()
+            if(commands.length === 2){
+                _.each(commands, function(command){
+                    workingCommand = command.split("|")
+                    if(workingCommand[0] === "players"){
+                        workingCommand.shift()
+                        players = workingCommand
+                    } else if(workingCommand[0] === "tabletops"){
+                        workingCommand.shift()
+                        tableTops = workingCommand
+                    } else {
+                        errors++
+                    }
+                })
+            } else {
+                errors++
+            }
+        } else {
+            errors++
+        }
+
+        if(errors > 0){
+            sendChat("Lighting Setup", "Please pass a proper setup command (e.g., !setupLighting||players|bob|jack|sally||tabletops|TableTop)")
+            return void 0
+        } else {
+            return {"players": players, "tableTops": tableTops}
+        }
+
+    }
 
     function parseRegisterMsg(msg, source) {
         if (msg.content.indexOf("|") > 0) {
@@ -101,7 +185,7 @@ let hybridF2fVirtualDynamicLighting = (function(){
             });
         }
         if (tabletops) {
-            _.each(character.tableTopId, function (controllingTableTop){
+            _.each(character.tableTopId, function (controllingTableTop) {
                 controlledBy = controlledBy + "," + controllingTableTop;
             });
 
@@ -118,19 +202,19 @@ let hybridF2fVirtualDynamicLighting = (function(){
         });
     }
 
-    function getPlayerCharacterIds(){
+    function getPlayerCharacterIds() {
         let characterIds = [];
-        _.each(state.cleanPlayerControlState.characters, function(character){
+        _.each(state.cleanPlayerControlState.characters, function (character) {
             characterIds.push(character.characterId)
         });
         return characterIds;
     }
 
 
-    function getCharacterFromState(characterId){
+    function getCharacterFromState(characterId) {
         let outputCharacter;
-        _.each(state.cleanPlayerControlState.characters, function(character){
-            if(characterId === character.characterId){
+        _.each(state.cleanPlayerControlState.characters, function (character) {
+            if (characterId === character.characterId) {
                 outputCharacter = character;
             }
         });
@@ -139,7 +223,24 @@ let hybridF2fVirtualDynamicLighting = (function(){
 
 
     on("chat:message", function (msg) {
-        if (msg.type === "api" && msg.content.indexOf("!resetRegistry") === 0) {
+        if (msg.type === "api" && msg.content.indexOf("!setupLighting") === 0) {
+            errors = 0
+            initRegistry(true);
+            initCleanPlayerControlState(true);
+
+            let setup = parseSetupMessage(msg)
+
+            if(errors === 0){
+                state.registry.playerCharacterNames = setup.players
+                state.registry.tableTopsNames = setup.tableTops
+            }
+
+            if (errors === 0) {
+                buildCleanPlayerControlState(state.registry.playerCharacterNames, state.registry.tableTopsNames)
+            } else {
+                sendChat("Lighting Setup", "Whoops! You made an error entering your command. Please check the syntax and try again. Sample syntax: !setupLighting||players|bob|jack|sally||tabletops|TableTop)")
+            }
+        } else if (msg.type === "api" && msg.content.indexOf("!resetRegistry") === 0) {
             initRegistry(true);
         } else if (msg.type === "api" && msg.content.indexOf("!registerPlayers") === 0) {
             errors = 0
@@ -157,13 +258,13 @@ let hybridF2fVirtualDynamicLighting = (function(){
             }
         } else if (msg.type === "api" && msg.content.indexOf("!resetLighting") === 0) {
             initCleanPlayerControlState(true);
-        } else if (msg.type === "api" && msg.content.indexOf("!setupLighting") === 0) {
+        } else if (msg.type === "api" && msg.content.indexOf("!setupLightingControlState") === 0) {
             initCleanPlayerControlState(true);
-            if(state.registry.playerCharacterNames.length === 0){
+            if (state.registry.playerCharacterNames.length === 0) {
                 sendChat("Lighting Setup", "Player character names not found. Run registerPlayers to set player names.");
                 errors++;
             }
-            if(state.registry.tableTopsNames.length === 0){
+            if (state.registry.tableTopsNames.length === 0) {
                 sendChat("Lighting Setup", "Table top names not found. Run registerTableTops to set table top names.");
                 errors++;
             }
@@ -172,12 +273,12 @@ let hybridF2fVirtualDynamicLighting = (function(){
             }
         } else if (msg.type === "api" && msg.content.indexOf("!readState") === 0) {
             // For Debugging
-            if(state.registry) {
+            if (state.registry) {
                 log(state.registry);
             } else {
                 log("No registry")
             }
-            if(state.cleanPlayerControlState) {
+            if (state.cleanPlayerControlState) {
                 log(state.cleanPlayerControlState);
             } else {
                 log("No cleanPlayerControlState")
