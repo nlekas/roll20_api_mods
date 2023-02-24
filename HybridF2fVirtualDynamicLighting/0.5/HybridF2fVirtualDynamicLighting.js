@@ -220,6 +220,25 @@ let hybridF2fVirtualDynamicLighting = (function () {
         });
         return outputCharacter
     }
+    
+    
+    function isOnlineOnlyPlayer(character) {
+        let isOnlineOnly = false;
+        let playerControllers = 0;
+        let tableTopControllers = 0;
+        if(character.playerControllersIds !== void 0){
+            playerControllers = character.playerControllersIds.length;
+        }
+
+        if(character.tableTopId !== void 0){
+            tableTopControllers = character.tableTopId.length;
+        }
+
+        if(tableTopControllers === 0 && playerControllers > 0){
+            isOnlineOnly = true;
+        }
+        return isOnlineOnly;
+    }
 
 
     on("chat:message", function (msg) {
@@ -310,8 +329,13 @@ let hybridF2fVirtualDynamicLighting = (function () {
             // Check if current token is a player character
             if (CurrentTO[0].id !== -1 && Token.get("represents") !== "" && getPlayerCharacterIds().indexOf(Character.id) !== -1) {
                 stateCharacter = getCharacterFromState(Character.id)
-                controlledBy = getTurnControllers(stateCharacter, true, true);
-                Character.set("controlledby", controlledBy);
+                if(isOnlineOnlyPlayer(stateCharacter)) {
+                    setControlledByAll(true, true);
+                } else {
+                    controlledBy = getTurnControllers(stateCharacter, true, true);
+                    Character.set("controlledby", controlledBy);
+                }
+
             } else {
                 // If current token is not a player character, return control to all players during npc and custom item turns...
                 setControlledByAll(true, true);
